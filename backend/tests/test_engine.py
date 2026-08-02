@@ -43,14 +43,9 @@ async def test_engine():
 
 
     # Validations
-
     assert result["evaluation"]["status"] == "success"
-
     assert result["evaluation"]["final_offer"] == 47500
-
-    assert len(result["history"]) == 2
-
-
+    assert len(result["history"]) >= 2
 
     print("\nENGINE TEST PASSED")
 

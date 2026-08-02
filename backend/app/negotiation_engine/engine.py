@@ -160,24 +160,23 @@ class NegotiationEngine:
         buyer_offer: float,
         seller_offer: float
     ):
-
+        total_spread = max(
+            abs(self.context.target_offer - self.context.initial_offer),
+            1.0
+        )
 
         buyer_offer = self.strategy_manager.buyer_next_offer(
-
-            buyer_offer,
-
-            self.context.buyer_strategy
-
+            current_offer=buyer_offer,
+            strategy=self.context.buyer_strategy,
+            total_spread=total_spread,
+            max_limit=self.context.target_offer
         )
-
 
         seller_offer = self.strategy_manager.seller_next_offer(
-
-            seller_offer,
-
-            self.context.seller_strategy
-
+            current_offer=seller_offer,
+            strategy=self.context.seller_strategy,
+            total_spread=total_spread,
+            min_limit=self.context.minimum_acceptable_offer
         )
 
-
-        return buyer_offer, seller_offer
+        return buyer_offer, seller_offer
