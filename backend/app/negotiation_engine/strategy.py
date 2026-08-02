@@ -1,44 +1,86 @@
+from typing import Optional
+
+
 class StrategyManager:
 
-    def __init__(self):
-
-        self.strategy_config = {
-            "Aggressive": {
-                "buyer_increment": 4000,
-                "seller_decrement": 1000
-            },
-            "Balanced": {
-                "buyer_increment": 2500,
-                "seller_decrement": 2500
-            },
-            "Conservative": {
-                "buyer_increment": 1000,
-                "seller_decrement": 4000
-            }
+    # Concession rate fractions relative to the initial negotiation spread
+    CONCESSION_RATES = {
+        "Aggressive": {
+            "buyer_rate": 0.10,
+            "seller_rate": 0.05,
+            "fallback_buyer": 4000.0,
+            "fallback_seller": 1000.0
+        },
+        "Balanced": {
+            "buyer_rate": 0.20,
+            "seller_rate": 0.20,
+            "fallback_buyer": 2500.0,
+            "fallback_seller": 2500.0
+        },
+        "Conservative": {
+            "buyer_rate": 0.25,
+            "seller_rate": 0.30,
+            "fallback_buyer": 1000.0,
+            "fallback_seller": 4000.0
         }
+    }
+
+    # Aliases for strategy names across agents/scenarios
+    STRATEGY_ALIASES = {
+        "competitive": "Aggressive",
+        "aggressive": "Aggressive",
+        "balanced": "Balanced",
+        "collaborative": "Balanced",
+        "neutral": "Balanced",
+        "conservative": "Conservative",
+        "accommodating": "Conservative"
+    }
+
+    def _normalize_strategy(self, strategy: str) -> str:
+        if not strategy:
+            return "Balanced"
+        return self.STRATEGY_ALIASES.get(strategy.strip().lower(), "Balanced")
 
     def buyer_next_offer(
         self,
         current_offer: float,
-        strategy: str
+        strategy: str,
+        total_spread: Optional[float] = None,
+        max_limit: Optional[float] = None
     ) -> float:
+        norm_strategy = self._normalize_strategy(strategy)
+        config = self.CONCESSION_RATES[norm_strategy]
 
-        config = self.strategy_config.get(
-            strategy,
-            self.strategy_config["Balanced"]
-        )
+        if total_spread is not None and total_spread > 0:
+            increment = round(total_spread * config["buyer_rate"], 2)
+            increment = max(increment, 1.0)
+        else:
+            increment = config["fallback_buyer"]
 
-        return current_offer + config["buyer_increment"]
+        next_offer = round(current_offer + increment, 2)
+        if max_limit is not None:
+            next_offer = min(next_offer, max_limit)
+
+        return next_offer
 
     def seller_next_offer(
         self,
         current_offer: float,
-        strategy: str
+        strategy: str,
+        total_spread: Optional[float] = None,
+        min_limit: Optional[float] = None
     ) -> float:
+        norm_strategy = self._normalize_strategy(strategy)
+        config = self.CONCESSION_RATES[norm_strategy]
 
-        config = self.strategy_config.get(
-            strategy,
-            self.strategy_config["Balanced"]
-        )
+        if total_spread is not None and total_spread > 0:
+            decrement = round(total_spread * config["seller_rate"], 2)
+            decrement = max(decrement, 1.0)
+        else:
+            decrement = config["fallback_seller"]
 
-        return current_offer - config["seller_decrement"]
+        next_offer = round(current_offer - decrement, 2)
+        if min_limit is not None:
+            next_offer = max(next_offer, min_limit)
+
+        return next_offer
