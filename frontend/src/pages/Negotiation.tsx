@@ -26,6 +26,7 @@ const Negotiation = () => {
   const [initialOffer, setInitialOffer] = useState("");
   const [minimumOffer, setMinimumOffer] = useState("");
   const [targetOffer, setTargetOffer] = useState("");
+  const [maxRounds, setMaxRounds] = useState("5");
 
   const [history, setHistory] = useState<any[]>([]);
   const [visibleMessages, setVisibleMessages] = useState<any[]>([]);
@@ -37,6 +38,8 @@ const Negotiation = () => {
 
   // For interactive mode
   const [chatInput, setChatInput] = useState("");
+  const [interactiveRound, setInteractiveRound] = useState(1);
+  const [lastSellerOffer, setLastSellerOffer] = useState<number | null>(null);
 
   const fetchAgents = async () => {
     setIsLoading(true);
@@ -139,9 +142,13 @@ const Negotiation = () => {
 
     if (negotiationType === "interactive") {
       setMode("interactive");
+      setInteractiveRound(1);
+      setLastSellerOffer(null);
+      setResult(null);
+      setIsSimulationComplete(false);
       setVisibleMessages([{
         role: "system",
-        content: `Starting interactive negotiation for ${subject}. You are negotiating with ${agents.find(a => a._id === sellerAgent)?.name || 'Agent'}. Make your first offer!`
+        content: `Starting interactive negotiation for ${subject}. You are playing the Buyer. You are negotiating with ${agents.find(a => a._id === sellerAgent)?.name || 'Agent'}. Make your first offer!`
       }]);
       return;
     }
@@ -157,7 +164,7 @@ const Negotiation = () => {
         initial_offer: Number(initialOffer),
         minimum_acceptable_offer: Number(minimumOffer),
         target_offer: Number(targetOffer),
-        max_rounds: 5,
+        max_rounds: Number(maxRounds),
         buyer_strategy: "Balanced",
         seller_strategy: "Balanced"
       });
@@ -176,25 +183,94 @@ const Negotiation = () => {
     }
   };
 
-  const handleInteractiveSubmit = (e: React.FormEvent) => {
+  const handleInteractiveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
 
+    // Extract numbers from chat input
+    const numericalOfferStr = chatInput.replace(/[^0-9.]/g, '');
+    const userOfferAmount = numericalOfferStr ? Number(numericalOfferStr) : (lastSellerOffer || Number(initialOffer));
+
     // Add user message
-    const userMsg = { role: "buyer", content: chatInput, offer: chatInput.replace(/[^0-9]/g, '') };
+    const userMsg = { role: "buyer", content: chatInput, offer: userOfferAmount };
     setVisibleMessages(prev => [...prev, userMsg]);
     setChatInput("");
     setIsTyping(true);
 
-    // Mock agent response
-    setTimeout(() => {
-      setIsTyping(false);
+    try {
+      const response = await API.post("/negotiations/interactive-round", {
+        scenario,
+        subject,
+        seller_strategy: "Balanced",
+        buyer_offer: userOfferAmount,
+        seller_current_offer: lastSellerOffer || Number(targetOffer), // initial seller position is targetOffer
+        initial_offer: Number(initialOffer),
+        target_offer: Number(targetOffer),
+        minimum_acceptable_offer: Number(minimumOffer),
+        round_number: interactiveRound,
+        max_rounds: Number(maxRounds)
+      });
+
+      const data = response.data;
+      
       setVisibleMessages(prev => [...prev, {
         role: "seller",
-        content: `I appreciate your offer, but I'm looking for something closer to my target. How about a slight adjustment?`,
-        offer: Math.floor(Number(initialOffer) * 1.1)
+        content: data.seller_message,
+        offer: data.seller_offer
       }]);
-    }, 2000);
+
+      setLastSellerOffer(data.seller_offer);
+      setInteractiveRound(prev => prev + 1);
+
+      if (data.status === "Accepted" || data.status === "Failed") {
+        setResult({
+          status: data.status,
+          final_offer: data.seller_offer
+        });
+        setIsSimulationComplete(true);
+
+        // Save the interactive session to the backend
+        try {
+          // Construct history array matching NegotiationRoundResponse
+          const history = [];
+          let currentRound = 1;
+          for (let i = 1; i < visibleMessages.length; i += 2) {
+             const bMsg = visibleMessages[i]; // user message
+             const sMsg = visibleMessages[i+1] || { role: "seller", content: data.seller_message, offer: data.seller_offer };
+             history.push({
+               round_number: currentRound++,
+               buyer_offer: bMsg.offer || 0,
+               seller_counter_offer: sMsg.offer || 0,
+               buyer_message: bMsg.content,
+               seller_message: sMsg.content,
+               status: (i + 1 >= visibleMessages.length) ? data.status : "pending"
+             });
+          }
+
+          await API.post("/negotiations/interactive-save", {
+            scenario,
+            buyer_agent_id: "user", // Default interactive user ID
+            seller_agent_id: sellerAgent,
+            negotiation_subject: subject,
+            initial_offer: Number(initialOffer),
+            minimum_acceptable_offer: Number(minimumOffer),
+            target_offer: Number(targetOffer),
+            max_rounds: Number(maxRounds),
+            buyer_strategy: "Balanced",
+            seller_strategy: "Balanced",
+            status: data.status,
+            final_offer: data.seller_offer,
+            history: history
+          });
+        } catch (saveError) {
+          console.error("Failed to save interactive session", saveError);
+        }
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || "Interactive negotiation failed");
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const renderSetupForm = () => (
@@ -252,6 +328,14 @@ const Negotiation = () => {
               {agents.filter(a => a.role === "buyer").map(agent => (
                 <option key={agent._id} value={agent._id} className="bg-slate-800">{agent.name}</option>
               ))}
+            </select>
+            
+            <label className="text-sm font-medium text-slate-300">Max Rounds</label>
+            <select className="glass-input" value={maxRounds} onChange={(e) => setMaxRounds(e.target.value)}>
+              <option value="3" className="bg-slate-800">3 Rounds (Quick)</option>
+              <option value="5" className="bg-slate-800">5 Rounds (Standard)</option>
+              <option value="7" className="bg-slate-800">7 Rounds (Extended)</option>
+              <option value="10" className="bg-slate-800">10 Rounds (Thorough)</option>
             </select>
           </div>
 
@@ -364,7 +448,7 @@ const Negotiation = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {negotiationType === "interactive" && (
+      {negotiationType === "interactive" && !isSimulationComplete && (
         <form onSubmit={handleInteractiveSubmit} className="glass-panel rounded-b-3xl p-4 flex gap-3 border-t border-white/10">
           <input
             className="glass-input flex-1"
@@ -378,7 +462,7 @@ const Negotiation = () => {
         </form>
       )}
       
-      {negotiationType === "simulation" && mode === "simulation" && isSimulationComplete && result && (
+      {isSimulationComplete && result && (
         <div className="glass-panel rounded-b-3xl p-4 flex justify-between items-center border-t border-white/10 bg-green-500/10">
           <div>
             <h3 className="font-bold text-green-400">Negotiation Concluded</h3>

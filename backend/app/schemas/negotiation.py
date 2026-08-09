@@ -107,3 +107,35 @@ class NegotiationResponse(BaseModel):
     strategies: Dict[str, str] = Field(
         default_factory=dict
     )
+
+class InteractiveRoundRequest(BaseModel):
+    scenario: str
+    subject: str
+    seller_strategy: str
+    buyer_offer: float
+    seller_current_offer: float
+    initial_offer: float
+    target_offer: float
+    minimum_acceptable_offer: float
+    round_number: int
+    max_rounds: int
+
+class InteractiveRoundResponse(BaseModel):
+    seller_offer: float
+    seller_message: str
+    status: str
+
+class InteractiveSaveRequest(BaseModel):
+    scenario: str
+    buyer_agent_id: str
+    seller_agent_id: str
+    negotiation_subject: str
+    initial_offer: float
+    minimum_acceptable_offer: float
+    target_offer: float
+    max_rounds: int
+    buyer_strategy: str
+    seller_strategy: str
+    status: str
+    final_offer: float
+    history: List[NegotiationRoundResponse]

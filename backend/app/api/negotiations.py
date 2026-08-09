@@ -2,7 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.schemas.negotiation import (
     NegotiationRequest,
-    NegotiationResponse
+    NegotiationResponse,
+    InteractiveRoundRequest,
+    InteractiveRoundResponse,
+    InteractiveSaveRequest
 )
 
 from app.orchestrator.orchestrator import run_negotiation
@@ -13,6 +16,9 @@ from app.services.negotiation_service import (
     get_all_negotiations,
     get_negotiation_by_id
 )
+
+from app.negotiation_engine.strategy import StrategyManager
+from app.services.llm_service import llm_service
 
 
 router = APIRouter(
@@ -68,6 +74,102 @@ async def start_new_negotiation(
         )
 
 
+
+# ---------------------------------------
+# Interactive Round
+# ---------------------------------------
+
+@router.post("/interactive-round", response_model=InteractiveRoundResponse)
+async def process_interactive_round(
+    req: InteractiveRoundRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        strategy_manager = StrategyManager()
+        total_spread = max(abs(req.target_offer - req.initial_offer), 1.0)
+        
+        seller_next_offer = strategy_manager.seller_next_offer(
+            current_offer=req.seller_current_offer,
+            strategy=req.seller_strategy,
+            total_spread=total_spread,
+            min_limit=req.minimum_acceptable_offer
+        )
+        
+        status = "pending"
+        # Condition 1: Buyer meets or exceeds the seller's floor/target
+        if req.buyer_offer >= seller_next_offer:
+            status = "Accepted"
+            seller_next_offer = req.buyer_offer
+        # Condition 2: Max rounds reached
+        elif req.round_number >= req.max_rounds:
+            status = "Failed"
+
+        seller_message = await llm_service.generate_rationale(
+            role="seller",
+            scenario=req.scenario,
+            subject=req.subject,
+            strategy=req.seller_strategy,
+            current_offer=seller_next_offer,
+            previous_offer=req.buyer_offer,
+            is_first_round=False
+        )
+        
+        return {
+            "seller_offer": seller_next_offer,
+            "seller_message": seller_message,
+            "status": status
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+# ---------------------------------------
+# Save Interactive Negotiation
+# ---------------------------------------
+
+@router.post("/interactive-save")
+async def save_interactive_negotiation(
+    req: InteractiveSaveRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        data = {
+            "scenario": req.scenario,
+            "buyer_agent_id": req.buyer_agent_id,
+            "seller_agent_id": req.seller_agent_id,
+            "negotiation_subject": req.negotiation_subject,
+            "initial_offer": req.initial_offer,
+            "minimum_acceptable_offer": req.minimum_acceptable_offer,
+            "target_offer": req.target_offer,
+            "max_rounds": req.max_rounds,
+            "buyer_strategy": req.buyer_strategy,
+            "seller_strategy": req.seller_strategy
+        }
+        
+        result = {
+            "final_offer": req.final_offer,
+            "status": req.status,
+            "message": "Interactive negotiation completed."
+        }
+        
+        engine_result = {
+            "history": req.history,
+            "strategies": {
+                "buyer": req.buyer_strategy,
+                "seller": req.seller_strategy
+            }
+        }
+        
+        saved_result = await save_negotiation(data, result, engine_result)
+        return saved_result
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 # ---------------------------------------
 # Get All Negotiations
