@@ -31,7 +31,7 @@ const Reports = () => {
 
 console.log(response.data);
 
-const sortedReports = response.data.data.reverse(); // Assuming oldest first from DB
+const sortedReports = response.data.data; // Already sorted latest-first from DB
 setReports(sortedReports);
 
 
@@ -83,9 +83,14 @@ setReports(sortedReports);
                   onClick={() => navigate('/negotiation', { state: { report } })}
                   className="glass-panel rounded-3xl p-6 shadow-lg flex flex-col gap-3 cursor-pointer hover:shadow-cyan-500/20 transition-all hover:-translate-y-1"
                 >
-                  <h2 className="text-2xl font-bold mb-2 text-cyan-300">
-                    {report.product}
-                  </h2>
+                  <div className="flex justify-between items-start mb-2">
+                    <h2 className="text-2xl font-bold text-cyan-300">
+                      {report.product}
+                    </h2>
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${report.buyer_agent_id === 'user' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'}`}>
+                      {report.buyer_agent_id === 'user' ? 'Interactive' : 'Simulation'}
+                    </span>
+                  </div>
 
                   <p className="text-slate-300"><span className="text-slate-500 font-medium mr-2">Scenario:</span>{report.scenario}</p>
                   <p className="text-slate-300"><span className="text-slate-500 font-medium mr-2">Final Offer:</span><span className="font-bold text-white">₹{report.final_offer}</span></p>

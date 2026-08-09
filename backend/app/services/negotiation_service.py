@@ -12,13 +12,15 @@ async def save_negotiation(
     engine_result: dict
 ):
 
-    buyer = await get_agent_by_id(
-        data["buyer_agent_id"]
-    )
+    if data["buyer_agent_id"] == "user":
+        buyer = {"name": "User"}
+    else:
+        buyer = await get_agent_by_id(data["buyer_agent_id"])
 
-    seller = await get_agent_by_id(
-        data["seller_agent_id"]
-    )
+    if data["seller_agent_id"] == "user":
+        seller = {"name": "User"}
+    else:
+        seller = await get_agent_by_id(data["seller_agent_id"])
 
 
     if not buyer:

@@ -14,7 +14,8 @@ from app.auth.dependencies import get_current_user
 
 from app.services.negotiation_service import (
     get_all_negotiations,
-    get_negotiation_by_id
+    get_negotiation_by_id,
+    save_negotiation
 )
 
 from app.negotiation_engine.strategy import StrategyManager
@@ -125,6 +126,8 @@ async def process_interactive_round(
             detail=str(e)
         )
 
+import traceback
+
 # ---------------------------------------
 # Save Interactive Negotiation
 # ---------------------------------------
@@ -166,6 +169,7 @@ async def save_interactive_negotiation(
         return saved_result
 
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail=str(e)

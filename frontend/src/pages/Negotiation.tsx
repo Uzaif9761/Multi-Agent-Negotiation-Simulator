@@ -41,6 +41,15 @@ const Negotiation = () => {
   const [interactiveRound, setInteractiveRound] = useState(1);
   const [lastSellerOffer, setLastSellerOffer] = useState<number | null>(null);
 
+  const getRoleName = (isBuyer: boolean) => {
+    switch (scenario) {
+      case "job_offer": return isBuyer ? "HR Management" : "Candidate";
+      case "budget_allocation": return isBuyer ? "Project Manager" : "Developer";
+      case "vendor_pricing":
+      default: return isBuyer ? "Buyer" : "Seller";
+    }
+  };
+
   const fetchAgents = async () => {
     setIsLoading(true);
     try {
@@ -148,7 +157,7 @@ const Negotiation = () => {
       setIsSimulationComplete(false);
       setVisibleMessages([{
         role: "system",
-        content: `Starting interactive negotiation for ${subject}. You are playing the Buyer. You are negotiating with ${agents.find(a => a._id === sellerAgent)?.name || 'Agent'}. Make your first offer!`
+        content: `Starting interactive negotiation for ${subject}. You are playing the ${getRoleName(true)}. You are negotiating with ${agents.find(a => a._id === sellerAgent)?.name || 'Agent'} (${getRoleName(false)}). Make your first offer!`
       }]);
       return;
     }
@@ -421,7 +430,7 @@ const Negotiation = () => {
               key={idx} 
               className={`flex flex-col ${isBuyer ? 'items-end' : 'items-start'}`}
             >
-              <span className="text-xs text-slate-400 mb-1 px-2">{isBuyer ? 'Buyer' : 'Seller'}</span>
+              <span className="text-xs text-slate-400 mb-1 px-2">{getRoleName(isBuyer)}</span>
               <div className={isBuyer ? 'chat-bubble-user' : 'chat-bubble-agent'}>
                 <p className="text-sm leading-relaxed">{msg.content || msg.rationale}</p>
                 {msg.offer && (
