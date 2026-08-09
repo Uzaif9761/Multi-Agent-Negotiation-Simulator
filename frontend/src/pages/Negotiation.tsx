@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import API from "../services/api";
 import toast from "react-hot-toast";
@@ -10,7 +10,10 @@ type Mode = "setup" | "simulation" | "interactive";
 
 const Negotiation = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  const isReportView = !!location.state?.report;
 
   const [mode, setMode] = useState<Mode>("setup");
   const [negotiationType, setNegotiationType] = useState<"simulation" | "interactive">("simulation");
@@ -58,12 +61,26 @@ const Negotiation = () => {
 
   // Simulate typing effect for simulation mode
   useEffect(() => {
-    // If a report was passed in, immediately start simulation mode
+    // If a report was passed in, immediately show the full conversation
     if (location.state?.report && mode === "setup") {
+      const reportHistory = location.state.report.history || [];
       setResult(location.state.report);
-      setHistory(location.state.report.history || []);
+      setHistory(reportHistory);
+      
+      const flatMessages: any[] = [];
+      reportHistory.forEach((round: any) => {
+        if (round.buyer_message || round.buyer_rationale) {
+          flatMessages.push({ role: "buyer", content: round.buyer_message || round.buyer_rationale, offer: round.buyer_offer });
+        }
+        if (round.seller_message || round.seller_rationale) {
+          flatMessages.push({ role: "seller", content: round.seller_message || round.seller_rationale, offer: round.seller_counter_offer });
+        }
+      });
+      
+      setVisibleMessages(flatMessages);
+      setIsSimulationComplete(true);
       setMode("simulation");
-      return; // The next effect trigger will handle the typing
+      return; 
     }
 
     if (mode === "simulation" && history.length > 0 && visibleMessages.length === 0) {
@@ -283,13 +300,17 @@ const Negotiation = () => {
         </div>
         
         <button onClick={() => {
-          setMode("setup");
-          setVisibleMessages([]);
-          setHistory([]);
-          setIsSimulationComplete(false);
-          window.history.replaceState({}, document.title);
+          if (isReportView) {
+            navigate('/reports');
+          } else {
+            setMode("setup");
+            setVisibleMessages([]);
+            setHistory([]);
+            setIsSimulationComplete(false);
+            window.history.replaceState({}, document.title);
+          }
         }} className="btn-secondary text-sm py-2">
-          End Session
+          {isReportView ? "Close" : "End Session"}
         </button>
       </div>
 
@@ -363,15 +384,17 @@ const Negotiation = () => {
             <h3 className="font-bold text-green-400">Negotiation Concluded</h3>
             <p className="text-sm text-slate-300">Status: {result.status} | Final Offer: ₹{result.final_offer}</p>
           </div>
-          <button onClick={() => {
-            setMode("setup");
-            setVisibleMessages([]);
-            setHistory([]);
-            setIsSimulationComplete(false);
-            window.history.replaceState({}, document.title) // clear location state
-          }} className="btn-primary py-2 text-sm">
-            Start New
-          </button>
+          {!isReportView && (
+            <button onClick={() => {
+              setMode("setup");
+              setVisibleMessages([]);
+              setHistory([]);
+              setIsSimulationComplete(false);
+              window.history.replaceState({}, document.title) // clear location state
+            }} className="btn-primary py-2 text-sm">
+              Start New
+            </button>
+          )}
         </div>
       )}
     </motion.div>
