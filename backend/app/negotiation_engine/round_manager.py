@@ -20,17 +20,17 @@ class RoundManager:
         self,
         buyer_offer: float,
         seller_counter_offer: float,
+        buyer_message: str,
+        seller_message: str,
         status: str
     ) -> NegotiationRound:
 
         return NegotiationRound(
-
             round_number=self.current_round,
-
             buyer_offer=buyer_offer,
-
             seller_counter_offer=seller_counter_offer,
-
+            buyer_message=buyer_message,
+            seller_message=seller_message,
             status=status
         )
 

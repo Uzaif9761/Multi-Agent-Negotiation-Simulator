@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import PageWrapper from "../components/PageWrapper";
 
 const Scenario = () => {
 
@@ -27,50 +28,33 @@ const Scenario = () => {
   ];
 
   return (
-
-    <div className="min-h-screen bg-gradient-to-r from-blue-900 via-indigo-800 to-purple-900 py-20">
-
-      <div className="max-w-6xl mx-auto px-6">
-
-        <h1 className="text-5xl font-bold text-white text-center mb-12">
-
+    <PageWrapper className="flex items-center">
+      <div className="w-full">
+        <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 text-center mb-12 tracking-tight">
           Choose Negotiation Scenario
-
         </h1>
 
         <div className="grid md:grid-cols-3 gap-8">
+          {scenarios.map((scenario, index) => (
+            <div
+              key={index}
+              className="glass-panel rounded-3xl p-8 hover:-translate-y-2 hover:shadow-2xl hover:shadow-cyan-500/20 transition-all duration-300 flex flex-col items-center text-center group"
+            >
+              <div className="text-6xl mb-6 group-hover:scale-110 transition-transform duration-300">
+                {scenario.icon}
+              </div>
 
-          {
+              <h2 className="text-2xl font-bold text-white mb-4">
+                {scenario.title}
+              </h2>
 
-            scenarios.map((scenario,index)=>(
+              <p className="text-slate-400 mb-8 flex-1">
+                {scenario.description}
+              </p>
 
-              <div
-                key={index}
-                className="bg-white rounded-2xl shadow-xl p-8 hover:scale-105 transition duration-300"
-              >
-
-                <div className="text-6xl text-center mb-5">
-
-                  {scenario.icon}
-
-                </div>
-
-                <h2 className="text-2xl font-bold text-center mb-4">
-
-                  {scenario.title}
-
-                </h2>
-
-                <p className="text-gray-600 text-center mb-8">
-
-                  {scenario.description}
-
-                </p>
-
-                <button
-
-                  onClick={() =>
-                    navigate("/negotiation", {
+              <button
+                onClick={() =>
+                  navigate("/negotiation", {
                     state: {
                       scenario:
                         scenario.title === "Job Offer"
@@ -79,31 +63,18 @@ const Scenario = () => {
                           ? "vendor_pricing"
                           : "budget_allocation"
                     }
-                    })
-                  }
-
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold"
-
-                >
-
-                  Start Negotiation
-
-                </button>
-
-              </div>
-
-            ))
-
-          }
-
+                  })
+                }
+                className="btn-primary w-full"
+              >
+                Start Negotiation
+              </button>
+            </div>
+          ))}
         </div>
-
       </div>
-
-    </div>
-
+    </PageWrapper>
   );
-
 };
 
 export default Scenario;

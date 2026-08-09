@@ -70,7 +70,8 @@ class NegotiationRoundResponse(BaseModel):
     buyer_offer: float
 
     seller_counter_offer: float
-
+    buyer_message: str = ""
+    seller_message: str = ""
     status: str
 
 

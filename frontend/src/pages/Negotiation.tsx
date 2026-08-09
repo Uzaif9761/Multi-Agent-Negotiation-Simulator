@@ -1,501 +1,387 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import API from "../services/api";
 import toast from "react-hot-toast";
-import Timeline from "../components/Timeline";
+import PageWrapper from "../components/PageWrapper";
+import { Send, Bot, User, Play, ChevronRight, Loader2 } from "lucide-react";
 
+type Mode = "setup" | "simulation" | "interactive";
 
 const Negotiation = () => {
-
   const location = useLocation();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const [mode, setMode] = useState<Mode>("setup");
+  const [negotiationType, setNegotiationType] = useState<"simulation" | "interactive">("simulation");
+  
   const [agents, setAgents] = useState<any[]>([]);
-
-
-  const [scenario, setScenario] = useState(
-  location.state?.scenario || "job_offer"
-);
-
+  const [scenario, setScenario] = useState(location.state?.scenario || location.state?.report?.scenario || "job_offer");
   const [buyerAgent, setBuyerAgent] = useState("");
-
   const [sellerAgent, setSellerAgent] = useState("");
-
-  const [subject, setSubject] = useState("");
-
+  const [subject, setSubject] = useState(location.state?.report?.product || "");
   const [initialOffer, setInitialOffer] = useState("");
-
   const [minimumOffer, setMinimumOffer] = useState("");
-
   const [targetOffer, setTargetOffer] = useState("");
 
-
+  const [history, setHistory] = useState<any[]>([]);
+  const [visibleMessages, setVisibleMessages] = useState<any[]>([]);
   const [result, setResult] = useState<any>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [isSimulationComplete, setIsSimulationComplete] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // For interactive mode
+  const [chatInput, setChatInput] = useState("");
 
-
-  const fetchAgents = async()=>{
-
-    try{
-
+  const fetchAgents = async () => {
+    setIsLoading(true);
+    try {
       const response = await API.get("/agents/");
-
       setAgents(response.data);
-
-    }
-    catch(error){
-
+    } catch (error) {
       console.log(error);
-
+    } finally {
+      setIsLoading(false);
     }
-
   };
 
-
-
-  useEffect(()=>{
-
+  useEffect(() => {
     fetchAgents();
+  }, []);
 
-  },[]);
+  // Auto-scroll chat
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [visibleMessages, isTyping]);
 
+  // Simulate typing effect for simulation mode
+  useEffect(() => {
+    // If a report was passed in, immediately start simulation mode
+    if (location.state?.report && mode === "setup") {
+      setResult(location.state.report);
+      setHistory(location.state.report.history || []);
+      setMode("simulation");
+      return; // The next effect trigger will handle the typing
+    }
 
+    if (mode === "simulation" && history.length > 0 && visibleMessages.length === 0) {
+      let currentIndex = 0;
+      let isCancelled = false;
+      setIsSimulationComplete(false);
+      
+      const flatMessages: any[] = [];
+      history.forEach((round: any) => {
+        if (round.buyer_message || round.buyer_rationale) {
+          flatMessages.push({ role: "buyer", content: round.buyer_message || round.buyer_rationale, offer: round.buyer_offer });
+        }
+        if (round.seller_message || round.seller_rationale) {
+          flatMessages.push({ role: "seller", content: round.seller_message || round.seller_rationale, offer: round.seller_counter_offer });
+        }
+      });
+      
+      const revealNextMessage = () => {
+        if (isCancelled) return;
+        
+        if (currentIndex < flatMessages.length) {
+          setIsTyping(true);
+          
+          setTimeout(() => {
+            if (isCancelled) return;
+            setIsTyping(false);
+            
+            setVisibleMessages(prev => {
+              if (prev.length > currentIndex) return prev;
+              return [...prev, flatMessages[currentIndex]];
+            });
+            
+            currentIndex++;
+            
+            if (currentIndex >= flatMessages.length) {
+              setIsSimulationComplete(true);
+            } else {
+              setTimeout(revealNextMessage, Math.random() * 2000 + 1000);
+            }
+          }, 1500);
+        } else {
+            setIsSimulationComplete(true);
+        }
+      };
+      
+      revealNextMessage();
+      
+      return () => {
+        isCancelled = true;
+      };
+    }
+  }, [mode, history, location.state]);
 
-
-  const startNegotiation = async(
-    e:React.FormEvent
-  )=>{
-
-
+  const startNegotiation = async (e: React.FormEvent) => {
     e.preventDefault();
 
-
-    try{
-
-
-      const response = await API.post(
-        "/negotiations/start",
-        {
-
-          scenario,
-
-          buyer_agent_id: buyerAgent,
-
-          seller_agent_id: sellerAgent,
-
-
-          negotiation_subject: subject,
-
-
-          initial_offer:Number(initialOffer),
-
-          minimum_acceptable_offer:Number(minimumOffer),
-
-          target_offer:Number(targetOffer),
-
-
-          max_rounds:5,
-
-
-          buyer_strategy:"Balanced",
-
-          seller_strategy:"Balanced"
-
-        }
-      );
-
-
-
-      console.log(
-        "Negotiation Response:",
-        response.data
-      );
-
-
-
-      setResult(
-        response.data
-      );
-
-
-
-      toast.success(
-        "Negotiation completed"
-      );
-
-
+    if (negotiationType === "interactive") {
+      setMode("interactive");
+      setVisibleMessages([{
+        role: "system",
+        content: `Starting interactive negotiation for ${subject}. You are negotiating with ${agents.find(a => a._id === sellerAgent)?.name || 'Agent'}. Make your first offer!`
+      }]);
+      return;
     }
 
-    catch(error:any){
+    try {
+      setIsSubmitting(true);
+      toast.loading("Starting simulation...", { id: "sim" });
+      const response = await API.post("/negotiations/start", {
+        scenario,
+        buyer_agent_id: buyerAgent,
+        seller_agent_id: sellerAgent,
+        negotiation_subject: subject,
+        initial_offer: Number(initialOffer),
+        minimum_acceptable_offer: Number(minimumOffer),
+        target_offer: Number(targetOffer),
+        max_rounds: 5,
+        buyer_strategy: "Balanced",
+        seller_strategy: "Balanced"
+      });
 
+      toast.success("Simulation complete! Replaying conversation...", { id: "sim" });
+      setResult(response.data);
+      setHistory(response.data.history || []);
+      setMode("simulation");
+      setVisibleMessages([]);
+      setIsSimulationComplete(false);
 
-      toast.error(
-
-        error.response?.data?.detail ||
-
-        "Negotiation failed"
-
-      );
-
-
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || "Negotiation failed", { id: "sim" });
+    } finally {
+      setIsSubmitting(false);
     }
-
-
   };
 
-
-
-
-return (
-
-<div className="min-h-screen bg-gradient-to-r from-blue-900 via-indigo-800 to-purple-900 py-20">
-
-
-<div className="max-w-5xl mx-auto px-6">
-
-
-<h1 className="text-5xl text-white font-bold text-center mb-10">
-
-AI Negotiation Simulator
-
-</h1>
-
-
-
-
-<form
-
-onSubmit={startNegotiation}
-
-className="bg-white p-8 rounded-xl"
-
->
-
-
-
-<select
-
-className="border p-3 w-full mb-4"
-
-value={scenario}
-
-onChange={(e)=>setScenario(e.target.value)}
-
->
-
-
-<option value="job_offer">
-Job Offer
-</option>
-
-
-<option value="vendor_pricing">
-Vendor Pricing
-</option>
-
-
-<option value="budget_allocation">
-Budget Allocation
-</option>
-
-
-</select>
-
-
-
-
-
-
-<select
-
-className="border p-3 w-full mb-4"
-
-value={buyerAgent}
-
-onChange={(e)=>setBuyerAgent(e.target.value)}
-
-required
-
->
-
-
-<option value="">
-Select Buyer Agent
-</option>
-
-
-{
-
-agents
-
-.filter(
-(a)=>a.role==="buyer"
-)
-
-.map(agent=>(
-
-<option
-
-key={agent._id}
-
-value={agent._id}
-
->
-
-{agent.name}
-
-</option>
-
-
-))
-
-
-}
-
-
-
-</select>
-
-
-
-
-
-
-<select
-
-className="border p-3 w-full mb-4"
-
-value={sellerAgent}
-
-onChange={(e)=>setSellerAgent(e.target.value)}
-
-required
-
->
-
-
-<option value="">
-Select Seller Agent
-</option>
-
-
-{
-
-agents
-
-.filter(
-(a)=>a.role==="seller"
-)
-
-.map(agent=>(
-
-<option
-
-key={agent._id}
-
-value={agent._id}
-
->
-
-{agent.name}
-
-</option>
-
-
-))
-
-
-}
-
-
-
-</select>
-
-
-
-
-
-
-<input
-
-className="border p-3 w-full mb-4"
-
-placeholder="Negotiation Subject"
-
-value={subject}
-
-onChange={(e)=>setSubject(e.target.value)}
-
-required
-
-/>
-
-
-
-
-
-
-<input
-
-className="border p-3 w-full mb-4"
-
-placeholder="Initial Offer"
-
-type="number"
-
-value={initialOffer}
-
-onChange={(e)=>setInitialOffer(e.target.value)}
-
-required
-
-/>
-
-
-
-
-
-
-<input
-
-className="border p-3 w-full mb-4"
-
-placeholder="Minimum Acceptable Offer"
-
-type="number"
-
-value={minimumOffer}
-
-onChange={(e)=>setMinimumOffer(e.target.value)}
-
-required
-
-/>
-
-
-
-
-
-
-<input
-
-className="border p-3 w-full mb-4"
-
-placeholder="Target Offer"
-
-type="number"
-
-value={targetOffer}
-
-onChange={(e)=>setTargetOffer(e.target.value)}
-
-required
-
-/>
-
-
-
-
-
-<button
-
-className="bg-black text-white p-3 rounded w-full"
-
->
-
-Start Negotiation
-
-</button>
-
-
-
-</form>
-
-
-
-
-
-
-{
-
-result && (
-
-<>
-
-<div className="bg-white mt-8 p-6 rounded-xl">
-
-
-<h2 className="text-2xl font-bold">
-
-Result
-
-</h2>
-
-
-
-<p>
-
-Status:
-{result.status}
-
-</p>
-
-
-
-<p>
-
-Message:
-{result.message}
-
-</p>
-
-
-
-<p>
-
-Final Offer:
-₹{result.final_offer}
-
-</p>
-
-
-
-</div>
-
-
-
-
-<div className="mt-10">
-
-<Timeline
-
-history={
-result.history || []
-}
-
-/>
-
-</div>
-
-
-</>
-
-
-)
-
-}
-
-
-
-
-</div>
-
-</div>
-
-
-);
-
-
+  const handleInteractiveSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    // Add user message
+    const userMsg = { role: "buyer", content: chatInput, offer: chatInput.replace(/[^0-9]/g, '') };
+    setVisibleMessages(prev => [...prev, userMsg]);
+    setChatInput("");
+    setIsTyping(true);
+
+    // Mock agent response
+    setTimeout(() => {
+      setIsTyping(false);
+      setVisibleMessages(prev => [...prev, {
+        role: "seller",
+        content: `I appreciate your offer, but I'm looking for something closer to my target. How about a slight adjustment?`,
+        offer: Math.floor(Number(initialOffer) * 1.1)
+      }]);
+    }, 2000);
+  };
+
+  const renderSetupForm = () => (
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="max-w-3xl mx-auto"
+    >
+      {isLoading ? (
+        <div className="flex justify-center items-center py-20">
+          <Loader2 className="animate-spin text-cyan-400" size={48} />
+        </div>
+      ) : (
+      <>
+        <div className="text-center mb-10">
+        <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 mb-4 tracking-tight">
+          New Session
+        </h1>
+        <p className="text-slate-400 text-lg">Configure your negotiation scenario and deploy agents.</p>
+      </div>
+
+      <div className="flex gap-4 mb-8 justify-center">
+        <button 
+          onClick={() => setNegotiationType("simulation")}
+          className={`px-6 py-3 rounded-xl font-medium transition-all ${negotiationType === "simulation" ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/25' : 'bg-white/5 text-slate-400 hover:bg-white/10 border border-white/10'}`}
+        >
+          <Bot className="inline-block mr-2" size={20} />
+          Simulation Mode
+        </button>
+        <button 
+          onClick={() => setNegotiationType("interactive")}
+          className={`px-6 py-3 rounded-xl font-medium transition-all ${negotiationType === "interactive" ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/25' : 'bg-white/5 text-slate-400 hover:bg-white/10 border border-white/10'}`}
+        >
+          <User className="inline-block mr-2" size={20} />
+          Interactive Mode
+        </button>
+      </div>
+
+      <form onSubmit={startNegotiation} className="glass-panel p-8 rounded-3xl">
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="flex flex-col gap-4">
+            <label className="text-sm font-medium text-slate-300">Scenario Type</label>
+            <select className="glass-input" value={scenario} onChange={(e) => setScenario(e.target.value)}>
+              <option value="job_offer" className="bg-slate-800">Job Offer</option>
+              <option value="vendor_pricing" className="bg-slate-800">Vendor Pricing</option>
+              <option value="budget_allocation" className="bg-slate-800">Budget Allocation</option>
+            </select>
+            
+            <label className="text-sm font-medium text-slate-300">Negotiation Subject</label>
+            <input className="glass-input" placeholder="e.g. Senior Developer Salary" value={subject} onChange={(e) => setSubject(e.target.value)} required />
+
+            <label className="text-sm font-medium text-slate-300">Buyer Agent</label>
+            <select className="glass-input" value={buyerAgent} onChange={(e) => setBuyerAgent(e.target.value)} required>
+              <option value="" className="bg-slate-800">Select Buyer Agent</option>
+              {agents.filter(a => a.role === "buyer").map(agent => (
+                <option key={agent._id} value={agent._id} className="bg-slate-800">{agent.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <label className="text-sm font-medium text-slate-300">Seller Agent</label>
+            <select className="glass-input" value={sellerAgent} onChange={(e) => setSellerAgent(e.target.value)} required>
+              <option value="" className="bg-slate-800">Select Seller Agent</option>
+              {agents.filter(a => a.role === "seller").map(agent => (
+                <option key={agent._id} value={agent._id} className="bg-slate-800">{agent.name}</option>
+              ))}
+            </select>
+
+            <label className="text-sm font-medium text-slate-300">Financial Bounds</label>
+            <div className="grid grid-cols-2 gap-3">
+              <input className="glass-input text-sm" placeholder="Initial Offer" type="number" value={initialOffer} onChange={(e) => setInitialOffer(e.target.value)} required />
+              <input className="glass-input text-sm" placeholder="Target Offer" type="number" value={targetOffer} onChange={(e) => setTargetOffer(e.target.value)} required />
+            </div>
+            <input className="glass-input text-sm" placeholder="Minimum Acceptable Offer" type="number" value={minimumOffer} onChange={(e) => setMinimumOffer(e.target.value)} required />
+          </div>
+        </div>
+
+        <button type="submit" className="btn-primary w-full mt-8 flex justify-center items-center gap-2" disabled={isSubmitting}>
+          {isSubmitting ? <><Loader2 className="animate-spin" size={20} /> Initializing Agent Communications...</> : <><Play size={20} /> {negotiationType === "simulation" ? "Start Simulation" : "Start Interactive Session"}</>}
+        </button>
+      </form>
+      </>
+      )}
+    </motion.div>
+  );
+
+  const renderChatInterface = () => (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-4xl mx-auto h-[80vh] flex flex-col"
+    >
+      <div className="glass-panel rounded-t-3xl p-4 flex justify-between items-center border-b border-white/10">
+        <div>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <Bot className="text-cyan-400" /> 
+            {subject || "Negotiation Session"}
+          </h2>
+          <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">
+            {negotiationType === "simulation" ? "Live Simulation Broadcast" : "Interactive Mock Session"}
+          </p>
+        </div>
+        
+        <button onClick={() => {
+          setMode("setup");
+          setVisibleMessages([]);
+          setHistory([]);
+          setIsSimulationComplete(false);
+          window.history.replaceState({}, document.title);
+        }} className="btn-secondary text-sm py-2">
+          End Session
+        </button>
+      </div>
+
+      <div className="glass-panel rounded-none flex-1 overflow-y-auto p-6 space-y-6">
+        {visibleMessages.map((msg, idx) => {
+          if (!msg) return null;
+          const isBuyer = msg.role === "buyer" || msg.agent_id === buyerAgent;
+          const isSystem = msg.role === "system";
+
+          if (isSystem) {
+            return (
+              <div key={idx} className="flex justify-center my-4">
+                <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-full text-xs text-slate-400 text-center">
+                  {msg.content}
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <motion.div 
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              key={idx} 
+              className={`flex flex-col ${isBuyer ? 'items-end' : 'items-start'}`}
+            >
+              <span className="text-xs text-slate-400 mb-1 px-2">{isBuyer ? 'Buyer' : 'Seller'}</span>
+              <div className={isBuyer ? 'chat-bubble-user' : 'chat-bubble-agent'}>
+                <p className="text-sm leading-relaxed">{msg.content || msg.rationale}</p>
+                {msg.offer && (
+                  <div className={`mt-3 pt-3 border-t ${isBuyer ? 'border-cyan-400/30' : 'border-slate-700'} flex justify-between items-center font-mono text-sm`}>
+                    <span>Offer:</span>
+                    <span className="font-bold">₹{msg.offer}</span>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          );
+        })}
+
+        {isTyping && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-start">
+            <span className="text-xs text-slate-400 mb-1 px-2">Agent is typing...</span>
+            <div className="chat-bubble-agent flex gap-1 items-center px-4 py-3">
+              <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce"></span>
+              <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+              <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+            </div>
+          </motion.div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {negotiationType === "interactive" && (
+        <form onSubmit={handleInteractiveSubmit} className="glass-panel rounded-b-3xl p-4 flex gap-3 border-t border-white/10">
+          <input
+            className="glass-input flex-1"
+            placeholder="Type your offer or argument..."
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+          />
+          <button type="submit" className="btn-primary py-2 px-4 rounded-xl flex items-center justify-center" disabled={isTyping || !chatInput.trim()}>
+            <Send size={20} />
+          </button>
+        </form>
+      )}
+      
+      {negotiationType === "simulation" && mode === "simulation" && isSimulationComplete && result && (
+        <div className="glass-panel rounded-b-3xl p-4 flex justify-between items-center border-t border-white/10 bg-green-500/10">
+          <div>
+            <h3 className="font-bold text-green-400">Negotiation Concluded</h3>
+            <p className="text-sm text-slate-300">Status: {result.status} | Final Offer: ₹{result.final_offer}</p>
+          </div>
+          <button onClick={() => {
+            setMode("setup");
+            setVisibleMessages([]);
+            setHistory([]);
+            setIsSimulationComplete(false);
+            window.history.replaceState({}, document.title) // clear location state
+          }} className="btn-primary py-2 text-sm">
+            Start New
+          </button>
+        </div>
+      )}
+    </motion.div>
+  );
+
+  return (
+    <PageWrapper className="pt-8">
+      {mode === "setup" ? renderSetupForm() : renderChatInterface()}
+    </PageWrapper>
+  );
 };
-
 
 export default Negotiation;

@@ -3,6 +3,7 @@ from app.negotiation_engine.round_manager import RoundManager
 from app.negotiation_engine.strategy import StrategyManager
 from app.negotiation_engine.evaluator import NegotiationEvaluator
 from app.negotiation_engine.history import NegotiationHistory
+from app.services.llm_service import llm_service
 
 
 class NegotiationEngine:
@@ -34,7 +35,31 @@ class NegotiationEngine:
 
 
 
+        previous_seller_offer = None
+
         while self.round_manager.can_continue():
+
+            is_first_round = (self.round_manager.current_round == 1)
+            
+            buyer_message = await llm_service.generate_rationale(
+                role="buyer",
+                scenario=self.context.scenario,
+                subject=self.context.negotiation_subject,
+                strategy=self.context.buyer_strategy,
+                current_offer=buyer_offer,
+                previous_offer=previous_seller_offer,
+                is_first_round=is_first_round
+            )
+            
+            seller_message = await llm_service.generate_rationale(
+                role="seller",
+                scenario=self.context.scenario,
+                subject=self.context.negotiation_subject,
+                strategy=self.context.seller_strategy,
+                current_offer=seller_offer,
+                previous_offer=buyer_offer,
+                is_first_round=False
+            )
 
 
             negotiation_round = self._create_round(
@@ -42,6 +67,10 @@ class NegotiationEngine:
                 buyer_offer=buyer_offer,
 
                 seller_offer=seller_offer,
+                
+                buyer_message=buyer_message,
+                
+                seller_message=seller_message,
 
                 status="pending"
 
@@ -84,6 +113,8 @@ class NegotiationEngine:
 
 
 
+            previous_seller_offer = seller_offer
+
             buyer_offer, seller_offer = (
                 self._generate_next_offers(
 
@@ -93,7 +124,6 @@ class NegotiationEngine:
 
                 )
             )
-
 
             self.round_manager.next_round()
 
@@ -125,6 +155,8 @@ class NegotiationEngine:
         self,
         buyer_offer: float,
         seller_offer: float,
+        buyer_message: str,
+        seller_message: str,
         status: str
     ):
 
@@ -133,6 +165,10 @@ class NegotiationEngine:
             buyer_offer=buyer_offer,
 
             seller_counter_offer=seller_offer,
+            
+            buyer_message=buyer_message,
+            
+            seller_message=seller_message,
 
             status=status
 

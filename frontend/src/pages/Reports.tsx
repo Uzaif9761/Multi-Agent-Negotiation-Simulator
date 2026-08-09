@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import API from "../services/api";
+import PageWrapper from "../components/PageWrapper";
 
 
 const Reports = () => {
+  const navigate = useNavigate();
 
   console.log("REPORT PAGE LOADED");
 
@@ -10,12 +14,10 @@ const Reports = () => {
 
 
   const [reports, setReports] = useState<any[]>([]);
-
-
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchReports = async()=>{
-
-
+    setIsLoading(true);
     try{
 
 
@@ -32,11 +34,10 @@ setReports(
 
     }
     catch(error){
-
       console.log(error);
-
+    } finally {
+      setIsLoading(false);
     }
-
 
   };
 
@@ -53,110 +54,52 @@ setReports(
 
 
   return (
-
-
-    <div className="min-h-screen bg-gradient-to-r from-blue-900 via-indigo-800 to-purple-900 py-20">
-
-
-      <div className="max-w-6xl mx-auto px-6">
-
-
-        <h1 className="text-5xl font-bold text-white text-center mb-10">
-
+    <PageWrapper>
+      <div className="flex flex-col gap-10">
+        <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 text-center tracking-tight">
           Negotiation Reports
-
         </h1>
 
-
-
-
-        <div className="grid md:grid-cols-2 gap-8">
-
-
-
+        {isLoading ? (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="animate-spin text-cyan-400" size={48} />
+          </div>
+        ) : reports.length === 0 ? (
+          <div className="text-center text-slate-400 py-10">
+            No reports found.
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-8">
         {
           reports.map((report,index)=>(
-
-
             <div
-
             key={index}
-
-            className="bg-white rounded-xl p-6 shadow-lg"
-
+            onClick={() => navigate('/negotiation', { state: { report } })}
+            className="glass-panel rounded-3xl p-6 shadow-lg flex flex-col gap-3 cursor-pointer hover:shadow-cyan-500/20 transition-all hover:-translate-y-1"
             >
-
-
-              <h2 className="text-2xl font-bold mb-4">
-
+              <h2 className="text-2xl font-bold mb-2 text-cyan-300">
                 {report.product}
-
               </h2>
 
-
-
-              <p>
-
-                Scenario:
-                {report.scenario}
-
+              <p className="text-slate-300"><span className="text-slate-500 font-medium mr-2">Scenario:</span>{report.scenario}</p>
+              <p className="text-slate-300"><span className="text-slate-500 font-medium mr-2">Final Offer:</span><span className="font-bold text-white">₹{report.final_offer}</span></p>
+              <p className="text-slate-300"><span className="text-slate-500 font-medium mr-2">Status:</span>
+                <span className={`px-2 py-1 rounded text-xs font-medium uppercase tracking-wider ${report.status === 'Accepted' || report.status === 'Approved' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                  {report.status}
+                </span>
               </p>
-
-
-
-              <p>
-
-                Final Offer:
-                ₹{report.final_offer}
-
-              </p>
-
-
-
-              <p>
-
-                Status:
-                {report.status}
-
-              </p>
-
-
-
-              <p>
-
-                Message:
-                {report.message}
-
-              </p>
-
-
-
-              <p>
-
-                Rounds:
-                {report.history?.length || 0}
-
-              </p>
-
-
-
+              <p className="text-slate-300"><span className="text-slate-500 font-medium mr-2">Message:</span>{report.message}</p>
+              
+              <div className="mt-auto pt-4 border-t border-white/10 flex justify-between items-center">
+                <span className="text-slate-400 text-sm">Rounds: {report.history?.length || 0}</span>
+              </div>
             </div>
-
-
           ))
-
         }
-
-
         </div>
-
-
+        )}
       </div>
-
-
-    </div>
-
-
+    </PageWrapper>
   );
 
 

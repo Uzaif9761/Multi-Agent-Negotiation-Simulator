@@ -1,9 +1,22 @@
-import { Link, NavLink } from "react-router-dom";
-import { Menu, X } from "lucide-react";
-import { useState } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Menu, X, LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    setIsLoggedIn(!!token);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setIsLoggedIn(false);
+    navigate("/login");
+  };
 
   const navItems = [
     { name: "Home", path: "/" },
@@ -45,13 +58,23 @@ const Navbar = () => {
             ))}
           </div>
 
-          {/* Login Button */}
-          <Link
-            to="/login"
-            className="hidden md:block bg-cyan-400 text-black px-4 py-2 rounded-lg hover:bg-cyan-300"
-          >
-            Login
-          </Link>
+          {/* Login/Logout Button */}
+          {isLoggedIn ? (
+            <button
+              onClick={handleLogout}
+              className="hidden md:flex items-center gap-2 bg-red-500/10 text-red-400 px-4 py-2 rounded-lg hover:bg-red-500/20 transition-all border border-red-500/20"
+            >
+              <LogOut size={18} />
+              Logout
+            </button>
+          ) : (
+            <Link
+              to="/login"
+              className="hidden md:block bg-cyan-400 text-black px-4 py-2 rounded-lg hover:bg-cyan-300 transition-colors"
+            >
+              Login
+            </Link>
+          )}
 
           {/* Mobile Menu Button */}
           <button
@@ -77,12 +100,22 @@ const Navbar = () => {
               </NavLink>
             ))}
 
-            <Link
-              to="/login"
-              className="bg-cyan-400 text-black px-4 py-2 rounded-lg w-fit"
-            >
-              Login
-            </Link>
+            {isLoggedIn ? (
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 bg-red-500/10 text-red-400 px-4 py-2 rounded-lg w-fit border border-red-500/20"
+              >
+                <LogOut size={18} />
+                Logout
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                className="bg-cyan-400 text-black px-4 py-2 rounded-lg w-fit"
+              >
+                Login
+              </Link>
+            )}
           </div>
         )}
       </div>
