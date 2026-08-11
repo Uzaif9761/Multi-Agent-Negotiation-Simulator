@@ -375,7 +375,18 @@ const Negotiation = () => {
     </motion.div>
   );
 
-  const renderChatInterface = () => (
+  const renderChatInterface = () => {
+    const totalRounds = result?.max_rounds || result?.history?.length || maxRounds;
+    const validMessages = visibleMessages.filter(m => m != null);
+    const sysMsgCount = validMessages.filter(m => m.role === 'system').length;
+    const activeMsgCount = validMessages.length - sysMsgCount;
+    const calculatedRound = Math.floor(activeMsgCount / 2) + 1;
+    const currentRoundNum = mode === "interactive" 
+      ? interactiveRound 
+      : (isSimulationComplete ? totalRounds : Math.min(Number(totalRounds), calculatedRound));
+    const currentAmount = [...validMessages].reverse().find(m => m.offer !== undefined)?.offer || initialOffer || "0";
+
+    return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -383,13 +394,26 @@ const Negotiation = () => {
     >
       <div className="glass-panel rounded-t-3xl p-4 flex justify-between items-center border-b border-white/10">
         <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Bot className="text-cyan-400" /> 
-            {subject || "Negotiation Session"}
-          </h2>
-          <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">
-            {negotiationType === "simulation" ? "Live Simulation Broadcast" : "Interactive Mock Session"}
-          </p>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Bot className="text-cyan-400" /> 
+              {subject || "Negotiation Session"}
+            </h2>
+            {!isReportView && !isSimulationComplete && (
+              <span className="flex items-center gap-1 text-red-400 text-xs font-bold animate-pulse bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">
+                <span className="w-2 h-2 rounded-full bg-red-500"></span> LIVE
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 uppercase tracking-widest mt-2">
+            <span>{negotiationType === "simulation" ? "Simulation" : "Interactive"}</span>
+            <span>•</span>
+            <span>Round {currentRoundNum}/{totalRounds}</span>
+            <span>•</span>
+            <span className="text-cyan-400 font-mono font-bold bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+              Current Offer: ₹{currentAmount}
+            </span>
+          </div>
         </div>
         
         <button onClick={() => {
@@ -492,6 +516,7 @@ const Negotiation = () => {
       )}
     </motion.div>
   );
+  };
 
   return (
     <PageWrapper className="pt-8">
