@@ -79,8 +79,6 @@ async def run_negotiation(data: dict):
 
         initial_offer=data["initial_offer"],
 
-        minimum_acceptable_offer=data["minimum_acceptable_offer"],
-
         target_offer=data["target_offer"],
 
         max_rounds=data.get(

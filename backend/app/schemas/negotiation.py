@@ -30,11 +30,6 @@ class NegotiationRequest(BaseModel):
     )
 
 
-    minimum_acceptable_offer: float = Field(
-        gt=0
-    )
-
-
     target_offer: float = Field(
         gt=0
     )
@@ -116,7 +111,6 @@ class InteractiveRoundRequest(BaseModel):
     seller_current_offer: float
     initial_offer: float
     target_offer: float
-    minimum_acceptable_offer: float
     round_number: int
     max_rounds: int
 
@@ -131,7 +125,6 @@ class InteractiveSaveRequest(BaseModel):
     seller_agent_id: str
     negotiation_subject: str
     initial_offer: float
-    minimum_acceptable_offer: float
     target_offer: float
     max_rounds: int
     buyer_strategy: str

@@ -4,6 +4,7 @@ from app.negotiation_engine.strategy import StrategyManager
 from app.negotiation_engine.evaluator import NegotiationEvaluator
 from app.negotiation_engine.history import NegotiationHistory
 from app.services.llm_service import llm_service
+import asyncio
 
 
 class NegotiationEngine:
@@ -41,7 +42,7 @@ class NegotiationEngine:
 
             is_first_round = (self.round_manager.current_round == 1)
             
-            buyer_message = await llm_service.generate_rationale(
+            buyer_task = llm_service.generate_rationale(
                 role="buyer",
                 scenario=self.context.scenario,
                 subject=self.context.negotiation_subject,
@@ -51,7 +52,7 @@ class NegotiationEngine:
                 is_first_round=is_first_round
             )
             
-            seller_message = await llm_service.generate_rationale(
+            seller_task = llm_service.generate_rationale(
                 role="seller",
                 scenario=self.context.scenario,
                 subject=self.context.negotiation_subject,
@@ -60,6 +61,8 @@ class NegotiationEngine:
                 previous_offer=buyer_offer,
                 is_first_round=False
             )
+
+            buyer_message, seller_message = await asyncio.gather(buyer_task, seller_task)
 
 
             negotiation_round = self._create_round(
@@ -205,14 +208,16 @@ class NegotiationEngine:
             current_offer=buyer_offer,
             strategy=self.context.buyer_strategy,
             total_spread=total_spread,
-            max_limit=self.context.target_offer
+            max_limit=self.context.target_offer,
+            max_rounds=self.context.max_rounds
         )
 
         seller_offer = self.strategy_manager.seller_next_offer(
             current_offer=seller_offer,
             strategy=self.context.seller_strategy,
             total_spread=total_spread,
-            min_limit=self.context.minimum_acceptable_offer
+            min_limit=self.context.initial_offer,
+            max_rounds=self.context.max_rounds
         )
 
         return buyer_offer, seller_offer

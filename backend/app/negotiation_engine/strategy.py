@@ -6,20 +6,20 @@ class StrategyManager:
     # Concession rate fractions relative to the initial negotiation spread
     CONCESSION_RATES = {
         "Aggressive": {
-            "buyer_rate": 0.10,
-            "seller_rate": 0.05,
+            "buyer_rate": 0.5,
+            "seller_rate": 0.5,
             "fallback_buyer": 4000.0,
             "fallback_seller": 1000.0
         },
         "Balanced": {
-            "buyer_rate": 0.20,
-            "seller_rate": 0.20,
+            "buyer_rate": 1.0,
+            "seller_rate": 1.0,
             "fallback_buyer": 2500.0,
             "fallback_seller": 2500.0
         },
         "Conservative": {
-            "buyer_rate": 0.25,
-            "seller_rate": 0.30,
+            "buyer_rate": 1.5,
+            "seller_rate": 1.5,
             "fallback_buyer": 1000.0,
             "fallback_seller": 4000.0
         }
@@ -46,13 +46,15 @@ class StrategyManager:
         current_offer: float,
         strategy: str,
         total_spread: Optional[float] = None,
-        max_limit: Optional[float] = None
+        max_limit: Optional[float] = None,
+        max_rounds: int = 5
     ) -> float:
         norm_strategy = self._normalize_strategy(strategy)
         config = self.CONCESSION_RATES[norm_strategy]
 
         if total_spread is not None and total_spread > 0:
-            increment = round(total_spread * config["buyer_rate"], 2)
+            base_concession = total_spread / (max_rounds * 2)
+            increment = round(base_concession * config["buyer_rate"], 2)
             increment = max(increment, 1.0)
         else:
             increment = config["fallback_buyer"]
@@ -68,13 +70,15 @@ class StrategyManager:
         current_offer: float,
         strategy: str,
         total_spread: Optional[float] = None,
-        min_limit: Optional[float] = None
+        min_limit: Optional[float] = None,
+        max_rounds: int = 5
     ) -> float:
         norm_strategy = self._normalize_strategy(strategy)
         config = self.CONCESSION_RATES[norm_strategy]
 
         if total_spread is not None and total_spread > 0:
-            decrement = round(total_spread * config["seller_rate"], 2)
+            base_concession = total_spread / (max_rounds * 2)
+            decrement = round(base_concession * config["seller_rate"], 2)
             decrement = max(decrement, 1.0)
         else:
             decrement = config["fallback_seller"]

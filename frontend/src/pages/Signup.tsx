@@ -24,7 +24,7 @@ const Signup = () => {
         setIsSubmitting(true);
 
         try {
-            const response = await API.post(
+            await API.post(
                 "/users/register",
                 { name, email, password }
             );

@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import API from "../services/api";
 import toast from "react-hot-toast";
 import PageWrapper from "../components/PageWrapper";
-import { Send, Bot, User, Play, ChevronRight, Loader2 } from "lucide-react";
+import { Send, Bot, User, Play, Loader2 } from "lucide-react";
 
 type Mode = "setup" | "simulation" | "interactive";
 
@@ -24,7 +24,6 @@ const Negotiation = () => {
   const [sellerAgent, setSellerAgent] = useState("");
   const [subject, setSubject] = useState(location.state?.report?.product || "");
   const [initialOffer, setInitialOffer] = useState("");
-  const [minimumOffer, setMinimumOffer] = useState("");
   const [targetOffer, setTargetOffer] = useState("");
   const [maxRounds, setMaxRounds] = useState("5");
 
@@ -164,29 +163,37 @@ const Negotiation = () => {
 
     try {
       setIsSubmitting(true);
-      toast.loading("Starting simulation...", { id: "sim" });
+      
+      setMode("simulation");
+      setVisibleMessages([{
+        role: "system",
+        content: `Agents are analyzing the market and preparing their opening offers for ${subject}...`
+      }]);
+      setIsTyping(true);
+      setIsSimulationComplete(false);
+      setHistory([]);
+
       const response = await API.post("/negotiations/start", {
         scenario,
         buyer_agent_id: buyerAgent,
         seller_agent_id: sellerAgent,
         negotiation_subject: subject,
         initial_offer: Number(initialOffer),
-        minimum_acceptable_offer: Number(minimumOffer),
         target_offer: Number(targetOffer),
         max_rounds: Number(maxRounds),
         buyer_strategy: "Balanced",
         seller_strategy: "Balanced"
       });
 
-      toast.success("Simulation complete! Replaying conversation...", { id: "sim" });
       setResult(response.data);
       setHistory(response.data.history || []);
-      setMode("simulation");
       setVisibleMessages([]);
-      setIsSimulationComplete(false);
 
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || "Negotiation failed", { id: "sim" });
+      toast.error(error.response?.data?.detail || "Negotiation failed");
+      setMode("setup");
+      setVisibleMessages([]);
+      setIsTyping(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -215,7 +222,6 @@ const Negotiation = () => {
         seller_current_offer: lastSellerOffer || Number(targetOffer), // initial seller position is targetOffer
         initial_offer: Number(initialOffer),
         target_offer: Number(targetOffer),
-        minimum_acceptable_offer: Number(minimumOffer),
         round_number: interactiveRound,
         max_rounds: Number(maxRounds)
       });
@@ -262,7 +268,6 @@ const Negotiation = () => {
             seller_agent_id: sellerAgent,
             negotiation_subject: subject,
             initial_offer: Number(initialOffer),
-            minimum_acceptable_offer: Number(minimumOffer),
             target_offer: Number(targetOffer),
             max_rounds: Number(maxRounds),
             buyer_strategy: "Balanced",
@@ -345,6 +350,8 @@ const Negotiation = () => {
               <option value="5" className="bg-slate-800">5 Rounds (Standard)</option>
               <option value="7" className="bg-slate-800">7 Rounds (Extended)</option>
               <option value="10" className="bg-slate-800">10 Rounds (Thorough)</option>
+              <option value="15" className="bg-slate-800">15 Rounds (Deep)</option>
+              <option value="20" className="bg-slate-800">20 Rounds (Exhaustive)</option>
             </select>
           </div>
 
@@ -362,7 +369,6 @@ const Negotiation = () => {
               <input className="glass-input text-sm" placeholder="Initial Offer" type="number" value={initialOffer} onChange={(e) => setInitialOffer(e.target.value)} required />
               <input className="glass-input text-sm" placeholder="Target Offer" type="number" value={targetOffer} onChange={(e) => setTargetOffer(e.target.value)} required />
             </div>
-            <input className="glass-input text-sm" placeholder="Minimum Acceptable Offer" type="number" value={minimumOffer} onChange={(e) => setMinimumOffer(e.target.value)} required />
           </div>
         </div>
 

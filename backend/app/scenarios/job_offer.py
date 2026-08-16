@@ -2,7 +2,7 @@ async def job_offer_negotiation(data: dict):
 
     candidate_offer = data["initial_offer"]
     target_salary = data["target_offer"]
-    minimum_salary = data["minimum_acceptable_offer"]
+    minimum_salary = data["initial_offer"]
 
     # Company accepts immediately
     if candidate_offer >= target_salary:

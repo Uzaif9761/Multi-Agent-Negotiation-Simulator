@@ -2,7 +2,7 @@ async def vendor_pricing_negotiation(data: dict):
 
     buyer_offer = float(data["initial_offer"])
     target_offer = float(data["target_offer"])
-    minimum_offer = float(data["minimum_acceptable_offer"])
+    minimum_offer = float(data["initial_offer"])
 
     # Vendor's negotiation window (20% of the gap)
     negotiation_margin = (target_offer - minimum_offer) * 0.20

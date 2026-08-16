@@ -13,8 +13,6 @@ class NegotiationContext(BaseModel):
 
     initial_offer: float
 
-    minimum_acceptable_offer: float
-
     target_offer: float
 
     max_rounds: int = 5

@@ -8,9 +8,9 @@ class NegotiationRules(BaseModel):
     not on scenario-specific logic.
     """
 
-    minimum_acceptable_offer: float = Field(
+    initial_offer: float = Field(
         ...,
-        description="Minimum value acceptable to the seller/company."
+        description="Starting offer value for the negotiation."
     )
 
     target_offer: float = Field(

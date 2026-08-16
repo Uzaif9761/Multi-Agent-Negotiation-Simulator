@@ -93,7 +93,8 @@ async def process_interactive_round(
             current_offer=req.seller_current_offer,
             strategy=req.seller_strategy,
             total_spread=total_spread,
-            min_limit=req.minimum_acceptable_offer
+            min_limit=req.initial_offer,
+            max_rounds=req.max_rounds
         )
         
         status = "pending"
@@ -144,7 +145,6 @@ async def save_interactive_negotiation(
             "seller_agent_id": req.seller_agent_id,
             "negotiation_subject": req.negotiation_subject,
             "initial_offer": req.initial_offer,
-            "minimum_acceptable_offer": req.minimum_acceptable_offer,
             "target_offer": req.target_offer,
             "max_rounds": req.max_rounds,
             "buyer_strategy": req.buyer_strategy,
