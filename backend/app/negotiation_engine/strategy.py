@@ -41,6 +41,27 @@ class StrategyManager:
             return "Balanced"
         return self.STRATEGY_ALIASES.get(strategy.strip().lower(), "Balanced")
 
+    def _clean_offer(self, offer: float, max_limit: Optional[float] = None, min_limit: Optional[float] = None) -> int:
+        offer_int = int(round(offer))
+        
+        if max_limit is not None:
+            offer_int = min(offer_int, int(round(max_limit)))
+        if min_limit is not None:
+            offer_int = max(offer_int, int(round(min_limit)))
+            
+        if offer_int > 1000:
+            rounded = int(round(offer_int / 100.0)) * 100
+            
+            if max_limit is not None and rounded > max_limit:
+                rounded = int(offer_int // 100) * 100
+                
+            if min_limit is not None and rounded < min_limit:
+                rounded = int((offer_int // 100) + 1) * 100
+                
+            offer_int = rounded
+            
+        return offer_int
+
     def buyer_next_offer(
         self,
         current_offer: float,
@@ -53,17 +74,14 @@ class StrategyManager:
         config = self.CONCESSION_RATES[norm_strategy]
 
         if total_spread is not None and total_spread > 0:
-            base_concession = total_spread / (max_rounds * 2)
-            increment = round(base_concession * config["buyer_rate"], 2)
-            increment = max(increment, 1.0)
+            steps = max(1, max_rounds - 1)
+            base_concession = total_spread / (steps * 2)
+            increment = int(round(base_concession * config["buyer_rate"]))
+            increment = max(increment, 1)
         else:
-            increment = config["fallback_buyer"]
+            increment = int(config["fallback_buyer"])
 
-        next_offer = round(current_offer + increment, 2)
-        if max_limit is not None:
-            next_offer = min(next_offer, max_limit)
-
-        return next_offer
+        return self._clean_offer(current_offer + increment, max_limit=max_limit)
 
     def seller_next_offer(
         self,
@@ -77,14 +95,11 @@ class StrategyManager:
         config = self.CONCESSION_RATES[norm_strategy]
 
         if total_spread is not None and total_spread > 0:
-            base_concession = total_spread / (max_rounds * 2)
-            decrement = round(base_concession * config["seller_rate"], 2)
-            decrement = max(decrement, 1.0)
+            steps = max(1, max_rounds - 1)
+            base_concession = total_spread / (steps * 2)
+            decrement = int(round(base_concession * config["seller_rate"]))
+            decrement = max(decrement, 1)
         else:
-            decrement = config["fallback_seller"]
+            decrement = int(config["fallback_seller"])
 
-        next_offer = round(current_offer - decrement, 2)
-        if min_limit is not None:
-            next_offer = max(next_offer, min_limit)
-
-        return next_offer
+        return self._clean_offer(current_offer - decrement, min_limit=min_limit)

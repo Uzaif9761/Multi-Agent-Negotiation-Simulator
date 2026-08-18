@@ -39,7 +39,9 @@ class LLMService:
         - Write highly realistic, human-like dialogue as if you are chatting on Teams or Slack.
         - Adopt a persona (e.g. use a name, sound natural, use conversational phrasing).
         - NEVER sound like a generic AI or use overly formal, robotic language.
-        - Use phrases like "Thanks so much," "That's great to hear," or "Let me talk to HR."
+        - Be lenient to moderate in your approach, open to compromise, and collaborative. Avoid being overly strict, aggressive, or stubborn.
+        - Focus on reaching a mutually beneficial agreement.
+        - Use phrases like "Thanks so much," "That's great to hear," or "Let me see what I can do."
         """
 
         if is_first_round:
