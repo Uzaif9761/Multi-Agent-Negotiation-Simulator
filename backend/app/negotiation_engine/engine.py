@@ -52,7 +52,8 @@ class NegotiationEngine:
             
             # Buyer Turn
             buyer_action = await asyncio.to_thread(buyer.take_turn, current_context)
-            buyer_last_val = buyer_action.value
+            if buyer_action.value is not None:
+                buyer_last_val = buyer_action.value
             
             if buyer_action.action_type == ActionType.ACCEPT:
                 final_status = "success"
@@ -69,7 +70,8 @@ class NegotiationEngine:
             
             # Seller Turn
             seller_action = await asyncio.to_thread(seller.take_turn, current_context)
-            seller_last_val = seller_action.value
+            if seller_action.value is not None:
+                seller_last_val = seller_action.value
             
             if seller_action.action_type == ActionType.ACCEPT:
                 final_status = "success"
